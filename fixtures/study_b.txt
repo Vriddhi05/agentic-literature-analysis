@@ -1,0 +1,3 @@
+Persistent Memory and Reproducibility in Research Agents
+
+This systems study examines durable run histories for research agents. The prototype stores evidence records, generated summaries, source references, and workflow metadata as versioned JSON files. Across 42 repeated tasks, persisted run state improved auditability and made restart recovery straightforward. The study notes that file storage does not support concurrent writers or large-scale collaboration.

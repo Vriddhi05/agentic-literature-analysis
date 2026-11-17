@@ -1,0 +1,3 @@
+Retrieval-Augmented Generation for Scientific Literature Review
+
+This controlled study evaluates retrieval augmented generation for evidence discovery across biomedical research papers. The method ranks source passages using dense embeddings and keyword search, then returns citations linked to source passages. Results show improved recall compared with keyword-only search, while answer precision depends on citation coverage. The evaluation used 120 benchmark questions and 30,000 open access abstracts. A limitation is that the benchmark overrepresents English-language biomedical publications.
