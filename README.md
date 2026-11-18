@@ -1,68 +1,60 @@
 # Agentic AI Framework for Literature Analysis
 
-A local, interview-ready demo that turns research PDFs or text files into structured, page-cited evidence and a cross-source synthesis. The pipeline is explicit and inspectable: Planner -> Evidence Extractor -> Local Embeddings -> Clusterer -> Synthesizer -> Citation Critic. Uploaded documents are treated as research data, including any imperative text they contain.
+Local interview demo for page- or section-cited literature exploration. The standard analysis path uses Sentence Transformers with `sentence-transformers/all-MiniLM-L6-v2`, CPU inference, and semantic document vectors. It also includes extractive synthesis, auditable citations, clustering, saved runs, and live Crossref search.
 
-## Features
+## Main capabilities
 
-- Local browser UI; no cloud account required
-- PDF, TXT, and Markdown uploads (15 MB total request limit)
-- Page-level evidence excerpts, per-paper summaries, recurring themes, and research gaps
-- Citation integrity review with limitations reported alongside results
-- JSON download and Markdown report export
-- Deterministic local feature-hash embeddings and cosine clusters
-- Saved runs in `data/runs/`, retained across server restarts
-- Optional live scholarly lookup using Crossref
-- Optional OpenAI-compatible synthesis when `OPENAI_API_KEY` is configured
-- Offline deterministic mode; PDF support provided by `pypdf`
+- PDF, TXT, and Markdown uploads (15 MB per request); PDF extraction uses `pypdf`.
+- Semantic encoder selection is visible in the UI and every JSON/Markdown report.
+- The pretrained model is cached in `data/model_cache/`; one vector is recorded per paper with model ID and dimensions.
+- Average-linkage agglomerative clustering uses cosine similarity with threshold `0.48`. Collections smaller than three papers are left unclustered.
+- Extractive summaries retain exact source text. References to fixture text identify the abstract excerpt and canonical arXiv URL; uploaded PDFs use page numbers.
+- Citation validity and claim support are separate checks. Candidate gap questions include evidence but are explicitly marked as unproven coverage hypotheses unless the source itself states a limitation.
+- Runs persist as JSON under `data/runs/` and survive application restarts. Markdown and JSON reports are downloadable.
+- Crossref scholarly search is live when network access is available.
+- LLM synthesis is unavailable until `OPENAI_API_KEY` is configured. A configured key is validated on first use; invalid keys produce an unavailable status. Source excerpts are sent to the configured OpenAI-compatible endpoint only when enabled.
+- If the Sentence Transformer cannot load, the UI shows the load error and offers an explicitly labeled lexical feature-hash fallback. It is never selected silently.
 
-## Run locally
+## Start on Windows
 
-Requires Python 3.10+. From the project directory:
+Requires Python 3.10+. From this folder:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+$env:PORT = "8000"
 python run.py
 ```
 
-Open <http://127.0.0.1:8000>. Choose **Load demo fixtures** for the two included sample papers, then run the analysis. Each run is saved under `data/runs/` and remains available after restart.
+Open <http://127.0.0.1:8000>. On the first semantic analysis, the model is downloaded into `data/model_cache/`; later runs reuse that cache. Set `PORT` to choose another port. Keep the server bound to `127.0.0.1` for a local demonstration.
 
-Set `PORT` to change the port. Set `HOST=0.0.0.0` only when you intentionally want to expose the local demo to the network.
+## Fixture corpus and provenance
 
-## Architecture
-
-```text
-Browser -> Python HTTP API -> upload parser -> PlannerAgent
-                                          -> EvidenceAgent (per source)
-                                          -> SynthesisAgent (across sources)
-                                          -> CriticAgent (citation checks)
-```
-
-The default backend uses Python's standard library plus `pypdf`. Embeddings use signed feature hashing (not a pretrained semantic model); clusters are connected components over cosine similarity. Extraction and synthesis are deterministic and extractive. For optional model synthesis, set `OPENAI_API_KEY`, and optionally `OPENAI_MODEL` and `OPENAI_BASE_URL`. When enabled, extracted summaries and their source references are sent to that configured endpoint. Without a key the workflow skips LLM synthesis. Crossref search sends the search query to Crossref only when the user submits a query. This is a prototype, not a substitute for reading the studies or a systematic review protocol.
+`fixtures/papers.json` contains 12 genuine research papers across embeddings, dense retrieval, RAG, scientific claim verification, and evaluation. Each record has the title, cited author string, year, arXiv ID, subtopic, exact source URL, and an abstract excerpt of at most 25 words. The full papers are not bundled; the UI and reports say “Abstract (verbatim excerpt)” and never invent page numbers. See [fixtures/README.md](fixtures/README.md).
 
 ## API
 
-- `GET /api/health` returns the service and pipeline mode.
-- `POST /api/analyze` accepts multipart form data with one or more `files` fields and persists the run.
+- `GET /api/health` reports model selection, load status, cache path, and LLM-key state without exposing credentials.
+- `GET /api/fixtures` lists fixture metadata.
+- `POST /api/analyze-fixtures` analyzes all 12 curated fixture excerpts.
+- `POST /api/analyze` accepts one or more uploaded `files` fields; `?encoder=fallback` selects the explicit fallback.
 - `GET /api/runs` lists saved analyses; `GET /api/runs/{id}` restores one.
 - `GET /api/runs/{id}/report.md` and `/report.json` download reports.
 - `GET /api/search?q=...` queries Crossref.
 
-## Interview walkthrough
+## Five-minute interview demo
 
-1. Click **Load demo fixtures** and run analysis.
-2. Show each 64-dimensional embedding and the resulting cosine clusters.
-3. Open a summary reference and trace it to its source page; show recurring themes and gaps.
-4. Download Markdown/JSON and open **Saved runs**.
-5. Restart the server, refresh saved runs, and open the previous result.
-6. Search Crossref live. If configured, discuss the separate LLM synthesis and its external data boundary; otherwise show its explicit skipped state.
+1. Load and analyze the 12-paper fixture; point out the selected model and 384-dimensional vectors.
+2. Show the cluster method, threshold, and small-collection behavior.
+3. Trace an extractive summary to its linked abstract excerpt; compare reference validity with claim-support status.
+4. Explain that candidate gaps are questions, not asserted absences, and inspect the evidence attached to each.
+5. Search Crossref, download the report, then restart the server and show the saved run remains available.
+6. Show the LLM-unavailable state unless a valid key has been configured. The lexical fallback is available only through explicit selection after a model error.
 
-## Known limitations
+## Limitations
 
-- Text extraction quality depends on the PDF; scanned image-only PDFs need OCR, which is not bundled.
-- Offline summaries use sentence ranking and keyword counts, not semantic interpretation.
-- PDF page references are preserved, but tables, formulas, and multi-column reading order may be imperfect.
-- Feature-hash embeddings encode lexical overlap, not deep semantic meaning; small fixture sets produce illustrative clusters only.
-- Run persistence uses local JSON files and is intended for a single-user demo, not concurrent production workloads.
-- Crossref and model calls need network access; model synthesis additionally needs an API key.
+- Fixture inputs are short abstract excerpts, not full papers. Their provenance and available text are shown per record.
+- The summaries are extractive, and the gap candidates are prompts for human review rather than systematic-review conclusions.
+- Clusters are illustrative for small collections and should not be interpreted as validated subject taxonomies.
+- Saved-run storage is local JSON intended for a single-user demo.
